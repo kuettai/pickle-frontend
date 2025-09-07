@@ -1,0 +1,215 @@
+/* Performance Optimization CSS */
+
+/* Hardware acceleration for critical elements */
+.score-display {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.left-side, .right-side {
+  will-change: transform, background-color;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.current-server {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Optimized animations using transforms */
+.updating {
+  animation: scoreUpdate 0.2s ease-out;
+}
+
+@keyframes scoreUpdate {
+  0% { transform: scale(1) translateZ(0); }
+  50% { transform: scale(1.1) translateZ(0); }
+  100% { transform: scale(1) translateZ(0); }
+}
+
+.touch-feedback {
+  animation: touchPulse 0.15s ease-out;
+}
+
+@keyframes touchPulse {
+  0% { 
+    background-color: #00AA00;
+    transform: scale(1) translateZ(0);
+  }
+  50% { 
+    background-color: #00FF00;
+    transform: scale(1.02) translateZ(0);
+  }
+  100% { 
+    background-color: #00AA00;
+    transform: scale(1) translateZ(0);
+  }
+}
+
+/* Reduce motion for accessibility and battery saving */
+@media (prefers-reduced-motion: reduce) {
+  .updating,
+  .touch-feedback,
+  .current-server {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Power save mode optimizations */
+.power-save-mode * {
+  animation-duration: 0.1s !important;
+  transition-duration: 0.1s !important;
+}
+
+.power-save-mode .touch-feedback {
+  animation: none;
+  background-color: #00FF00 !important;
+}
+
+.power-save-mode .updating {
+  animation: none;
+  transform: none !important;
+}
+
+/* Optimize repaints and reflows */
+.player-top,
+.player-bottom,
+.player-1 {
+  contain: layout style paint;
+}
+
+.court {
+  contain: layout;
+}
+
+/* GPU layer promotion for smooth animations */
+.touch-ripple {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Optimize text rendering */
+.score-display {
+  text-rendering: optimizeSpeed;
+  font-smooth: never;
+  -webkit-font-smoothing: none;
+}
+
+/* Reduce layout thrashing */
+.game-controls button,
+.home-control button {
+  contain: layout style;
+}
+
+/* Optimize for 60fps animations */
+@keyframes pulse {
+  0%, 100% { 
+    opacity: 1;
+    transform: translateZ(0);
+  }
+  50% { 
+    opacity: 0.7;
+    transform: translateZ(0);
+  }
+}
+
+/* Memory efficient gradients */
+.court::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, #00AA00 0%, #008800 100%);
+  z-index: -1;
+  will-change: auto;
+}
+
+/* Efficient box shadows */
+.current-server {
+  box-shadow: 0 0 0 4px #FFA500;
+  /* Avoid expensive blur shadows for better performance */
+}
+
+/* Optimize for mobile devices */
+@media (max-width: 1024px) {
+  .score-display {
+    font-size: 20vh; /* Slightly smaller for mobile performance */
+  }
+  
+  /* Reduce animation complexity on mobile */
+  .touch-feedback {
+    animation-duration: 0.1s;
+  }
+  
+  .updating {
+    animation-duration: 0.15s;
+  }
+}
+
+/* High refresh rate display optimizations */
+@media (min-resolution: 120dpi) {
+  .score-display {
+    font-smooth: auto;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Optimize for landscape orientation */
+@media (orientation: landscape) {
+  .court {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+}
+
+/* Efficient hover states (desktop only) */
+@media (hover: hover) {
+  .config-player-btn:hover {
+    transform: translateY(-2px) translateZ(0);
+    transition: transform 0.1s ease-out;
+  }
+}
+
+/* Optimize loading states */
+.loading {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg) translateZ(0); }
+  to { transform: rotate(360deg) translateZ(0); }
+}
+
+/* Contain paint for better performance */
+.modal-content,
+.auth-screen,
+.match-setup {
+  contain: paint;
+}
+
+/* Optimize connection indicator */
+.connection-indicator {
+  contain: layout style;
+  will-change: auto; /* Only animate when needed */
+}
+
+/* Efficient transitions */
+.submit-btn,
+.later-btn,
+.new-game-btn {
+  transition: background-color 0.1s ease-out, transform 0.1s ease-out;
+  will-change: auto;
+}
+
+.submit-btn:active,
+.later-btn:active,
+.new-game-btn:active {
+  transform: scale(0.98) translateZ(0);
+}

@@ -16,7 +16,8 @@ if (typeof OfflineManager === 'undefined') {
 }
 
 class PickleballApp {
-  constructor() {
+  constructor(container) {
+    this.container = container || document.body;
     this.gameState = {
       matchId: null,
       gameMode: null,
@@ -36,6 +37,10 @@ class PickleballApp {
     this.gameStartTime = null;
     this.gameDuration = 0;
     this.matchConfiguration = null;
+    
+    // Initialize Performance Optimizer
+    this.performanceOptimizer = null;
+    this.initializePerformanceOptimizer();
     
     // Initialize ScoreSubmission system
     this.initializeScoreSubmission();
@@ -60,6 +65,35 @@ class PickleballApp {
     this.config = TournamentConfig;
     
     this.init();
+  }
+  
+  initializePerformanceOptimizer() {
+    const initOptimizer = () => {
+      if (typeof PerformanceOptimizer !== 'undefined') {
+        this.performanceOptimizer = new PerformanceOptimizer();
+        this.performanceOptimizer.startPerformanceMonitoring();
+        this.performanceOptimizer.optimizeBatteryUsage();
+        
+        // Wrap critical methods with performance monitoring
+        this.handleCourtTouch = this.performanceOptimizer.measureTouchResponse(
+          this.handleCourtTouch.bind(this)
+        );
+        
+        this.updateDisplay = this.performanceOptimizer.measurePerformance(
+          'updateDisplay',
+          this.updateDisplay.bind(this)
+        );
+        
+        this.updateScoreDisplay = this.performanceOptimizer.measurePerformance(
+          'updateScoreDisplay', 
+          this.updateScoreDisplay.bind(this)
+        );
+        
+      } else {
+        setTimeout(initOptimizer, 100);
+      }
+    };
+    initOptimizer();
   }
   
   initializeScoreSubmission() {
@@ -332,17 +366,28 @@ class PickleballApp {
   }
 
   setupEventListeners() {
-    // Touch events for court scoring
+    // Touch events for court scoring with passive listeners for performance
     const leftArea = document.querySelector('.left-side');
     const rightArea = document.querySelector('.right-side');
     
     if (leftArea) {
-      leftArea.addEventListener('touchend', (e) => this.handleCourtTouch('left', e));
+      // Use passive listeners for better performance
+      leftArea.addEventListener('touchstart', (e) => {
+        // Immediate visual feedback on touch start
+        this.addTouchFeedback('left');
+      }, { passive: true });
+      
+      leftArea.addEventListener('touchend', (e) => this.handleCourtTouch('left', e), { passive: false });
       leftArea.addEventListener('click', (e) => this.handleCourtTouch('left', e));
     }
     
     if (rightArea) {
-      rightArea.addEventListener('touchend', (e) => this.handleCourtTouch('right', e));
+      rightArea.addEventListener('touchstart', (e) => {
+        // Immediate visual feedback on touch start
+        this.addTouchFeedback('right');
+      }, { passive: true });
+      
+      rightArea.addEventListener('touchend', (e) => this.handleCourtTouch('right', e), { passive: false });
       rightArea.addEventListener('click', (e) => this.handleCourtTouch('right', e));
     }
   }
@@ -352,8 +397,10 @@ class PickleballApp {
     
     if (this.gameState.gameStatus !== 'active') return;
     
-    // Add immediate touch feedback
-    this.addTouchFeedback(touchedSide);
+    // Add immediate touch feedback with performance optimization
+    requestAnimationFrame(() => {
+      this.addTouchFeedback(touchedSide);
+    });
     
     this.saveGameState();
     
@@ -367,17 +414,45 @@ class PickleballApp {
       this.performSideOut();
     }
     
-    this.updateDisplay();
-    this.checkGameCompletion();
+    // Batch DOM updates for better performance
+    if (this.performanceOptimizer) {
+      this.performanceOptimizer.batchDOMUpdates([
+        () => this.updateDisplay(),
+        () => this.checkGameCompletion()
+      ]);
+    } else {
+      this.updateDisplay();
+      this.checkGameCompletion();
+    }
   }
   
   addTouchFeedback(side) {
-    const sideElement = document.querySelector(`.${side}-side`);
+    // Use cached element for better performance
+    let sideElement = this.performanceOptimizer ? 
+      this.performanceOptimizer.getCachedElement(`${side}-side`) : 
+      document.querySelector(`.${side}-side`);
+    
+    if (!sideElement) {
+      sideElement = document.querySelector(`.${side}-side`);
+      if (this.performanceOptimizer) {
+        this.performanceOptimizer.cacheElement(`${side}-side`, `.${side}-side`);
+      }
+    }
+    
     if (sideElement) {
-      sideElement.classList.add('touch-feedback');
-      setTimeout(() => {
-        sideElement.classList.remove('touch-feedback');
-      }, 300);
+      // Use optimized animation for touch feedback
+      if (this.performanceOptimizer) {
+        this.performanceOptimizer.createOptimizedAnimation(sideElement, [
+          { backgroundColor: '#00AA00', transform: 'scale(1)' },
+          { backgroundColor: '#00FF00', transform: 'scale(1.02)' },
+          { backgroundColor: '#00AA00', transform: 'scale(1)' }
+        ], { duration: 150 });
+      } else {
+        sideElement.classList.add('touch-feedback');
+        setTimeout(() => {
+          sideElement.classList.remove('touch-feedback');
+        }, 300);
+      }
     }
   }
 
@@ -622,7 +697,18 @@ class PickleballApp {
   }
 
   updateScoreDisplay() {
-    const scoreElement = document.getElementById('score-display');
+    // Use cached element for better performance
+    let scoreElement = this.performanceOptimizer ? 
+      this.performanceOptimizer.getCachedElement('score-display') : 
+      document.getElementById('score-display');
+    
+    if (!scoreElement) {
+      scoreElement = document.getElementById('score-display');
+      if (this.performanceOptimizer) {
+        this.performanceOptimizer.cacheElement('score-display', '#score-display');
+      }
+    }
+    
     if (!scoreElement) return;
     
     const leftScore = this.gameState.teams.left.score;
@@ -636,13 +722,19 @@ class PickleballApp {
       scoreText = `${leftScore} - ${rightScore} - ${serverNum}`;
     }
     
-    // Add smooth update animation
-    scoreElement.classList.add('updating');
-    scoreElement.textContent = scoreText;
+    // Optimized animation using transform
+    if (this.performanceOptimizer) {
+      this.performanceOptimizer.createOptimizedAnimation(scoreElement, [
+        { transform: 'scale(1)', opacity: 1 },
+        { transform: 'scale(1.1)', opacity: 0.8 },
+        { transform: 'scale(1)', opacity: 1 }
+      ], { duration: 200 });
+    } else {
+      scoreElement.classList.add('updating');
+      setTimeout(() => scoreElement.classList.remove('updating'), 300);
+    }
     
-    setTimeout(() => {
-      scoreElement.classList.remove('updating');
-    }, 300);
+    scoreElement.textContent = scoreText;
   }
 
   updateServerHighlight() {
@@ -2594,6 +2686,25 @@ class PickleballApp {
 document.addEventListener('DOMContentLoaded', () => {
   window.app = new PickleballApp();
 });
+
+// Add destroy method for cleanup
+PickleballApp.prototype.destroy = function() {
+  if (this.performanceOptimizer) {
+    this.performanceOptimizer.destroy();
+  }
+  
+  if (this.touchFeedback) {
+    this.touchFeedback.destroy && this.touchFeedback.destroy();
+  }
+  
+  if (this.offlineManager) {
+    this.offlineManager.destroy && this.offlineManager.destroy();
+  }
+  
+  // Clear game state
+  this.gameState = null;
+  this.gameHistory = [];
+};
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
