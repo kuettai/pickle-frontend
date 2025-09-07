@@ -1,0 +1,184 @@
+/* Submission Queue Modal */
+#queue-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.queue-content {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    min-width: 600px;
+    max-width: 700px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.queue-content h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    text-align: center;
+}
+
+.queue-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.empty-queue {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 20px;
+}
+
+.queue-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: #f8f9fa;
+}
+
+.queue-info {
+    flex: 1;
+}
+
+.queue-info strong {
+    color: #495057;
+}
+
+.queue-info small {
+    color: #6c757d;
+}
+
+.process-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.process-btn:hover {
+    background: #218838;
+}
+
+.audit-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #dee2e6;
+}
+
+.audit-section h4 {
+    margin: 0 0 10px 0;
+    color: #495057;
+    font-size: 16px;
+}
+
+.audit-list {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.audit-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.audit-item.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.audit-item.failed {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.queue-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+
+.process-all-btn, .clear-queue-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.process-all-btn {
+    background: #007bff;
+    color: white;
+}
+
+.process-all-btn:hover:not(:disabled) {
+    background: #0056b3;
+}
+
+.process-all-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+.clear-queue-btn {
+    background: #dc3545;
+    color: white;
+}
+
+.clear-queue-btn:hover:not(:disabled) {
+    background: #c82333;
+}
+
+.clear-queue-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+/* Queue Button */
+.queue-btn {
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-right: 10px;
+    animation: pulse 2s infinite;
+}
+
+.queue-btn:hover {
+    background: #138496;
+}

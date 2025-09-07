@@ -1,0 +1,16 @@
+{
+  "name": "pickleball-scoring-system",
+  "version": "1.0.0",
+  "description": "Tournament pickleball scoring system for tablets",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "jsdom": "^23.0.0",
+    "@vitest/coverage-v8": "^1.0.0"
+  }
+}
