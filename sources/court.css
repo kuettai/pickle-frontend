@@ -17,11 +17,16 @@ body {
     overflow-y: auto;
     height: 100vh;
     -webkit-overflow-scrolling: touch;
+    padding: 20px 0;
 }
 
 .match-setup body {
     overflow: visible !important;
     height: auto !important;
+}
+
+#team-assignment-section {
+    margin-top: 0;
 }
 
 /* Auth and Setup Screens */
@@ -49,7 +54,7 @@ body {
     font-size: 18px;
     border: none;
     border-radius: 8px;
-    min-width: 300px;
+    /* min-width: 300px; */
     width: 100%;
 }
 
@@ -190,6 +195,41 @@ body {
     font-style: italic;
 }
 
+/* 6-Digit Verification Input Styles */
+.digit-container {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.digit-input {
+    width: 40px;
+    height: 50px;
+    min-width: unset;
+    text-align: center;
+    font-size: 20px;
+    font-weight: bold;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    color: #333;
+    font-family: monospace;
+    transition: all 0.2s ease;
+}
+
+.digit-input:focus {
+    outline: none;
+    border-color: #4a7c59;
+    box-shadow: 0 0 8px rgba(74, 124, 89, 0.3);
+    transform: scale(1.05);
+}
+
+.digit-input:valid {
+    border-color: #28a745;
+    background: #f8fff8;
+}
+
 #verification-code {
     text-align: center;
     font-size: 24px;
@@ -267,6 +307,53 @@ body {
     font-size: 14px;
 }
 
+/* Top Bar Styles */
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    margin-bottom: 20px;
+}
+
+.top-bar-left {
+    display: flex;
+    align-items: center;
+}
+
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.connection-indicator {
+    font-size: 14px;
+    font-weight: bold;
+    color: white;
+}
+
+/* Main Title */
+.main-title {
+    text-align: center;
+    color: #90EE90;
+    font-size: 32px;
+    font-weight: bold;
+    margin: 20px 0;
+    line-height: 1.2;
+}
+
+/* Team Assignment Mode - Hide elements */
+.team-assignment-mode .main-title,
+.team-assignment-mode .demo-matches,
+.team-assignment-mode #match-uuid,
+.team-assignment-mode button[onclick="app.loadMatch()"],
+.team-assignment-mode .match-confirmation {
+    display: none;
+}
+
 /* Header with user info and logout */
 .header {
     display: flex;
@@ -299,7 +386,9 @@ body {
 
 /* Team Assignment Interface */
 .team-assignment {
-    margin: 20px 0;
+    margin: 20px auto;
+    max-width: 800px;
+    width: 100%;
 }
 
 .court-preview {
@@ -310,8 +399,8 @@ body {
 }
 
 .left-court-preview, .right-court-preview {
-    width: 250px;
-    height: 120px;
+    width: 350px;
+    height: 150px;
     background: #4a7c59;
     color: white;
     display: flex;
@@ -361,7 +450,7 @@ body {
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    min-width: 150px;
+    width: 100%;
     min-height: 44px;
     transition: all 0.2s ease;
     touch-action: manipulation;
@@ -384,6 +473,7 @@ body {
     border-radius: 8px;
     cursor: pointer;
     margin-top: 20px;
+    width: 100%;
     min-height: 44px;
     transition: all 0.2s ease;
     touch-action: manipulation;
@@ -418,7 +508,7 @@ body {
 
 .config-left-side, .config-right-side {
     flex: 1;
-    max-width: 250px;
+    max-width: 350px;
     background: #4a7c59;
     border-radius: 8px;
     padding: 15px;
@@ -536,8 +626,8 @@ body {
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 24vh;
+    transform: translate(-50%, -50%) !important;
+    font-size: 28vh;
     font-weight: bold;
     color: white;
     background: rgba(0, 0, 0, 0.8);
@@ -548,6 +638,8 @@ body {
     white-space: nowrap;
     transition: all 0.3s ease;
 }
+
+
 
 #score-display.updating {
     transform: translate(-50%, -50%) scale(1.1);

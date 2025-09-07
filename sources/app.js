@@ -722,12 +722,12 @@ class PickleballApp {
       scoreText = `${leftScore} - ${rightScore} - ${serverNum}`;
     }
     
-    // Optimized animation using transform
+    // Optimized animation using transform while preserving centering
     if (this.performanceOptimizer) {
       this.performanceOptimizer.createOptimizedAnimation(scoreElement, [
-        { transform: 'scale(1)', opacity: 1 },
-        { transform: 'scale(1.1)', opacity: 0.8 },
-        { transform: 'scale(1)', opacity: 1 }
+        { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+        { transform: 'translate(-50%, -50%) scale(1.1)', opacity: 0.8 },
+        { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 }
       ], { duration: 200 });
     } else {
       scoreElement.classList.add('updating');
@@ -796,7 +796,7 @@ class PickleballApp {
   showStep1Screen() {
     document.body.innerHTML = `
       <div class="auth-screen">
-        <div class="connection-indicator" id="connection-status">📶 Online</div>
+        <div class="top-bar" id="top-bar"></div>
         <h1>Pickleball Tournament Scoring</h1>
         <div class="auth-form">
           <div class="step-indicator">
@@ -828,7 +828,7 @@ class PickleballApp {
     this.authState.currentScreen = 'auth-step2';
     document.body.innerHTML = `
       <div class="auth-screen">
-        <div class="connection-indicator" id="connection-status">📶 Online</div>
+        <div class="top-bar" id="top-bar"></div>
         <h1>Pickleball Tournament Scoring</h1>
         <div class="auth-form">
           <div class="step-indicator">
@@ -838,7 +838,7 @@ class PickleballApp {
           </div>
           <h3>Step 2: Enter Verification Code</h3>
           <p class="contact-info">Code sent via ${method} to: <strong>${maskedContact}</strong></p>
-          <input type="text" id="verification-code" placeholder="Enter 6-digit code" maxlength="6" />
+          <div class="digit-container" id="digit-container"></div>
           <div class="auth-buttons">
             <button onclick="app.verifyCode()" id="verify-btn">Verify</button>
             <button onclick="app.goBackToStep1()" class="back-btn">← Back</button>
@@ -852,8 +852,14 @@ class PickleballApp {
       </div>
     `;
     
+    // Setup 6-digit inputs
+    this.setup6DigitInput();
+    
     // Start resend timer
     this.startResendTimer();
+    
+    // Update top bar
+    this.updateTopBar();
     
     // Update connection indicator
     if (this.offlineManager) {
@@ -931,7 +937,7 @@ class PickleballApp {
   }
   
   async verifyCode() {
-    const verificationCode = document.getElementById('verification-code')?.value.trim() || this.mockVerificationCode;
+    const verificationCode = this.getVerificationCode() || this.mockVerificationCode;
     
     if (!verificationCode || verificationCode.length !== 6) {
       if (document.getElementById('verification-code')) {
@@ -1035,6 +1041,26 @@ class PickleballApp {
     this.showStep1Screen();
   }
   
+  updateTopBar() {
+    const topBar = document.getElementById('top-bar');
+    if (!topBar) return;
+    
+    const refereeId = sessionStorage.getItem('refereeId') || 'DEMO-REF';
+    const refereeType = refereeId.includes('ADMIN') ? 'Admin' : 'Referee';
+    const isOnline = navigator.onLine;
+    const connectionStatus = isOnline ? '📶 Online' : '📥 Offline';
+    
+    topBar.innerHTML = `
+      <div class="top-bar-left">
+        <span class="connection-indicator">${connectionStatus}</span>
+      </div>
+      <div class="top-bar-right">
+        <span class="user-info">Logged in as: ${refereeType} (${refereeId})</span>
+        <button class="logout-btn" onclick="app.logout()">Logout</button>
+      </div>
+    `;
+  }
+  
   async resendCode() {
     if (!this.authState.refId) {
       this.goBackToStep1();
@@ -1103,6 +1129,138 @@ class PickleballApp {
     }, 1000);
   }
 
+  setup6DigitInput() {
+    const container = document.getElementById('digit-container');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    for (let i = 0; i < 6; i++) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'digit-input';
+      input.maxLength = 1;
+      input.setAttribute('inputmode', 'numeric');
+      input.dataset.index = i;
+      
+      // Input event for auto-advance and validation
+      input.addEventListener('input', (e) => {
+        const value = e.target.value;
+        
+        // Only allow numeric characters - keep first digit if mixed
+        if (value.length > 1) {
+          // If multiple characters, keep only the first digit if it's numeric
+          const firstChar = value[0];
+          if (/^[0-9]$/.test(firstChar)) {
+            e.target.value = firstChar;
+          } else {
+            e.target.value = '';
+            return;
+          }
+        } else if (!/^[0-9]$/.test(value) && value !== '') {
+          e.target.value = '';
+          return;
+        }
+        
+        // Auto-advance to next input
+        const nextIndex = parseInt(e.target.dataset.index) + 1;
+        if (nextIndex < 6) {
+          const nextInput = container.querySelector(`[data-index="${nextIndex}"]`);
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }
+        
+        // Check for auto-submit
+        this.checkAutoSubmit();
+      });
+      
+      // Keydown event for backspace navigation
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace') {
+          if (e.target.value !== '') {
+            // Clear current input if it has a value
+            e.target.value = '';
+          } else {
+            // Move to previous input if current is empty
+            const prevIndex = parseInt(e.target.dataset.index) - 1;
+            if (prevIndex >= 0) {
+              const prevInput = container.querySelector(`[data-index="${prevIndex}"]`);
+              if (prevInput) {
+                prevInput.focus();
+              }
+            }
+          }
+        }
+      });
+      
+      // Paste event for distributing 6-digit codes
+      input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pastedData = e.clipboardData.getData('text/plain');
+        
+        if (/^[0-9]{6}$/.test(pastedData)) {
+          // Distribute digits across inputs
+          for (let j = 0; j < 6; j++) {
+            const digitInput = container.querySelector(`[data-index="${j}"]`);
+            if (digitInput) {
+              digitInput.value = pastedData[j];
+            }
+          }
+          
+          // Focus last input
+          const lastInput = container.querySelector(`[data-index="5"]`);
+          if (lastInput) {
+            lastInput.focus();
+          }
+          
+          // Check for auto-submit
+          this.checkAutoSubmit();
+        }
+      });
+      
+      container.appendChild(input);
+    }
+    
+    // Focus first input
+    const firstInput = container.querySelector('[data-index="0"]');
+    if (firstInput) {
+      firstInput.focus();
+    }
+  }
+  
+  getVerificationCode() {
+    const container = document.getElementById('digit-container');
+    if (!container) return '';
+    
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      const input = container.querySelector(`[data-index="${i}"]`);
+      if (input) {
+        code += input.value;
+      }
+    }
+    
+    return code;
+  }
+  
+  checkAutoSubmit() {
+    const code = this.getVerificationCode();
+    if (code.length === 6) {
+      this.handleVerification(code);
+    }
+  }
+  
+  handleVerification(code) {
+    // Set the code and trigger verification
+    this.mockVerificationCode = code;
+    this.verifyCode();
+  }
+  
+  showVerificationStep() {
+    this.showStep2Screen('demo@example.com', 'demo');
+  }
+  
   showAuthError(message) {
     const errorDiv = document.getElementById('auth-error');
     if (errorDiv) {
@@ -1144,59 +1302,55 @@ class PickleballApp {
     
     document.body.innerHTML = `
       <div class="match-setup">
-        <div class="connection-indicator" id="connection-status">📶 Online</div>
+        <div class="top-bar" id="top-bar"></div>
+        <h1 class="main-title">Pickleball Tournament<br>Scoring System</h1>
         <div class="header">
           <h2>Match Setup</h2>
           <div class="user-info">
-            <span>Logged in as: ${refereeType} (${refereeId})</span>
             ${pendingCount > 0 ? `<button class="pending-btn" onclick="app.showPendingSubmissions()">📤 ${pendingCount} Old Pending</button>` : ''}
             ${queueCount > 0 ? `<button class="queue-btn" onclick="app.showSubmissionQueue()">🔄 ${queueCount} Queued</button>` : ''}
-            <button class="logout-btn" onclick="app.logout()">Logout</button>
           </div>
         </div>
         <div class="setup-form">
           <input type="text" id="match-uuid" placeholder="Enter Match UUID (try: MATCH-001)" value="MATCH-002" />
           <button onclick="app.loadMatch()">Load Match</button>
-          <div class="demo-matches">
-            <p><strong>Demo Matches:</strong></p>
-            <p>MATCH-001 - Singles Championship (Max: 15)</p>
-            <p>MATCH-002 - Doubles Tournament (Max: 21)</p>
-            <p>MATCH-003 - Default Rules Tournament (Max: 11)</p>
-          </div>
-          <div id="team-assignment-section" style="display: none;">
-            <h3>Team Court Assignment</h3>
-            <div class="team-assignment">
-              <div class="team-buttons">
-                <button onclick="app.switchSides()" id="switch-btn">Switch Sides</button>
-              </div>
-              <div class="court-preview">
-                <div class="left-court-preview" id="left-preview">LEFT COURT</div>
-                <div class="right-court-preview" id="right-preview">RIGHT COURT</div>
-              </div>
-              <div class="player-selection" id="player-selection">
-                <h4>Select Starting Server & Receiver</h4>
-                <div class="player-config-court">
-                  <div class="config-left-side" id="config-left">
-                    <div class="config-court-label">LEFT COURT</div>
-                    <div class="config-players" id="left-players"></div>
-                  </div>
-                  <div class="config-right-side" id="config-right">
-                    <div class="config-court-label">RIGHT COURT</div>
-                    <div class="config-players" id="right-players"></div>
-                  </div>
-                </div>
-                <div class="config-instructions">
-                  <p>1. Click a player to select as <strong>First Server</strong></p>
-                  <p>2. Click a player on opposite court to select as <strong>First Receiver</strong></p>
-                </div>
-                <div class="config-status" id="config-status"></div>
-              </div>
+        </div>
+        <div id="team-assignment-section" style="display: none;">
+          <h3>Team Court Assignment</h3>
+          <div class="team-assignment">
+            <div class="team-buttons">
+              <button onclick="app.switchSides()" id="switch-btn">Switch Sides</button>
             </div>
-            <button onclick="app.startGame()" id="start-game-btn">Start Game</button>
+            <div class="court-preview">
+              <div class="left-court-preview" id="left-preview">LEFT COURT</div>
+              <div class="right-court-preview" id="right-preview">RIGHT COURT</div>
+            </div>
+            <div class="player-selection" id="player-selection">
+              <h4>Select Starting Server & Receiver</h4>
+              <div class="player-config-court">
+                <div class="config-left-side" id="config-left">
+                  <div class="config-court-label">LEFT COURT</div>
+                  <div class="config-players" id="left-players"></div>
+                </div>
+                <div class="config-right-side" id="config-right">
+                  <div class="config-court-label">RIGHT COURT</div>
+                  <div class="config-players" id="right-players"></div>
+                </div>
+              </div>
+              <div class="config-instructions">
+                <p>1. Click a player to select as <strong>First Server</strong></p>
+                <p>2. Click a player on opposite court to select as <strong>First Receiver</strong></p>
+              </div>
+              <div class="config-status" id="config-status"></div>
+            </div>
           </div>
+          <button onclick="app.startGame()" id="start-game-btn" disabled>Start Game</button>
         </div>
       </div>
     `;
+    
+    // Update top bar
+    this.updateTopBar();
     
     // Update connection indicator
     if (this.offlineManager) {
@@ -1299,8 +1453,9 @@ class PickleballApp {
         if (existing) existing.remove();
         setupForm.appendChild(confirmDiv);
         
-        // Show team assignment section
+        // Show team assignment section and hide other elements
         document.getElementById('team-assignment-section').style.display = 'block';
+        document.querySelector('.match-setup').classList.add('team-assignment-mode');
         
         // Reset game state for new match
         this.gameState = {
@@ -1493,17 +1648,24 @@ class PickleballApp {
     
     if (!this.selectedServerSide) {
       statusDiv.innerHTML = '<p class="config-waiting">Select a player to serve first</p>';
+      document.getElementById('start-game-btn').disabled = true;
+      document.querySelector('.config-instructions').style.display = 'block';
     } else if (!this.selectedReceiverSide) {
       statusDiv.innerHTML = `
         <p class="config-progress">✓ Server: <strong>${this.selectedServerName}</strong></p>
         <p class="config-waiting">Now select receiver from opposite court</p>
       `;
+      document.getElementById('start-game-btn').disabled = true;
+      document.querySelector('.config-instructions').style.display = 'block';
     } else {
       statusDiv.innerHTML = `
         <p class="config-complete">✓ Server: <strong>${this.selectedServerName}</strong> (${this.selectedServerSide.toUpperCase()} court)</p>
         <p class="config-complete">✓ Receiver: <strong>${this.selectedReceiverName}</strong> (${this.selectedReceiverSide.toUpperCase()} court)</p>
-        <p class="config-ready">Ready to start game!</p>
       `;
+      
+      // Enable Start Game button and hide instructions
+      document.getElementById('start-game-btn').disabled = false;
+      document.querySelector('.config-instructions').style.display = 'none';
     }
   }
 
@@ -1696,7 +1858,6 @@ class PickleballApp {
   createGameScreen() {
     document.body.innerHTML = `
       <div class="court">
-        <div class="connection-indicator" id="connection-status">📶 Online</div>
         <div id="score-display">0 - 0</div>
         <div class="left-side">
           <div class="left-top"></div>
