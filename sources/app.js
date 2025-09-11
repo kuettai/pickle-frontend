@@ -51,14 +51,13 @@ class PickleballApp {
     // Initialize OfflineManager system
     this.offlineManager = null;
     
-    // Two-step authentication state
+    // Username/password authentication state
     this.authState = {
-      refId: null,
-      verificationCode: null,
+      user: null,
       token: null,
-      codeRequestTime: null,
-      attempts: 0,
-      currentScreen: 'auth-step1'
+      refreshToken: null,
+      expiresAt: null,
+      isAuthenticated: false
     };
     
     // Use external configuration
@@ -344,25 +343,28 @@ class PickleballApp {
 
   checkExistingAuth() {
     const authToken = sessionStorage.getItem('authToken');
-    const refereeId = sessionStorage.getItem('refereeId');
-    const tokenExpires = sessionStorage.getItem('tokenExpires');
+    const expiresAt = sessionStorage.getItem('expiresAt');
+    const userData = sessionStorage.getItem('userData');
     
-    if (authToken && refereeId && tokenExpires && Date.now() < parseInt(tokenExpires)) {
-      // Already authenticated and token not expired
-      this.authState.token = authToken;
-      this.authState.currentScreen = 'authenticated';
-      this.showMatchSetup();
-    } else {
-      // Need to authenticate (or token expired)
-      if (tokenExpires && Date.now() >= parseInt(tokenExpires)) {
-        // Clear expired token
-        sessionStorage.removeItem('authToken');
-        sessionStorage.removeItem('refreshToken');
-        sessionStorage.removeItem('tokenExpires');
-        sessionStorage.removeItem('refereeId');
+    if (authToken && expiresAt && userData) {
+      const expiry = new Date(expiresAt);
+      if (Date.now() < expiry.getTime()) {
+        // Token still valid
+        this.authState = {
+          user: JSON.parse(userData),
+          token: authToken,
+          refreshToken: sessionStorage.getItem('refreshToken'),
+          expiresAt: expiresAt,
+          isAuthenticated: true
+        };
+        this.showMatchSetup();
+        return;
       }
-      this.showAuthScreen();
     }
+    
+    // Clear expired or invalid auth data
+    this.clearAuthData();
+    this.showAuthScreen();
   }
 
   setupEventListeners() {
@@ -789,77 +791,30 @@ class PickleballApp {
 
 
   showAuthScreen() {
-    this.authState.currentScreen = 'auth-step1';
-    this.showStep1Screen();
+    this.showLoginScreen();
   }
   
-  showStep1Screen() {
+  showLoginScreen() {
     document.body.innerHTML = `
       <div class="auth-screen">
         <div class="top-bar" id="top-bar"></div>
         <h1>Pickleball Tournament Scoring</h1>
         <div class="auth-form">
-          <div class="step-indicator">
-            <span class="step active">1</span>
-            <span class="step-line"></span>
-            <span class="step">2</span>
-          </div>
-          <h3>Step 1: Enter Referee ID</h3>
-          <input type="text" id="ref-id" placeholder="Enter Referee ID (try: REF2024)" />
-          <button onclick="app.requestVerificationCode()" id="send-code-btn">Send Code</button>
-          <div class="demo-codes">
-            <p><strong>Demo IDs:</strong></p>
-            <p>REF2024 - Tournament Referee</p>
-            <p>ADMIN123 - Tournament Admin</p>
-            <p>DEMO - Demo Mode (code: 111111)</p>
+          <h3>Login</h3>
+          <input type="text" id="username" placeholder="Username" />
+          <input type="password" id="password" placeholder="Password" />
+          <button onclick="app.login()" id="login-btn">Login</button>
+          <div class="demo-credentials">
+            <p><strong>Demo Credentials:</strong></p>
+            <p>demo / demo123 - Demo User</p>
+            <p>admin / admin123 - Admin User</p>
+            <p>referee / ref123 - Referee User</p>
+            <p>test / test123 - Test User</p>
           </div>
           <div id="auth-error" class="auth-error" style="display: none;"></div>
         </div>
       </div>
     `;
-    
-    // Update connection indicator
-    if (this.offlineManager) {
-      this.offlineManager.updateConnectionIndicator();
-    }
-  }
-  
-  showStep2Screen(maskedContact, method) {
-    this.authState.currentScreen = 'auth-step2';
-    document.body.innerHTML = `
-      <div class="auth-screen">
-        <div class="top-bar" id="top-bar"></div>
-        <h1>Pickleball Tournament Scoring</h1>
-        <div class="auth-form">
-          <div class="step-indicator">
-            <span class="step completed">✓</span>
-            <span class="step-line"></span>
-            <span class="step active">2</span>
-          </div>
-          <h3>Step 2: Enter Verification Code</h3>
-          <p class="contact-info">Code sent via ${method} to: <strong>${maskedContact}</strong></p>
-          <div class="digit-container" id="digit-container"></div>
-          <div class="auth-buttons">
-            <button onclick="app.verifyCode()" id="verify-btn">Verify</button>
-            <button onclick="app.goBackToStep1()" class="back-btn">← Back</button>
-          </div>
-          <div class="resend-section">
-            <button onclick="app.resendCode()" id="resend-btn" disabled>Resend Code</button>
-            <span id="resend-timer">Wait 60s</span>
-          </div>
-          <div id="auth-error" class="auth-error" style="display: none;"></div>
-        </div>
-      </div>
-    `;
-    
-    // Setup 6-digit inputs
-    this.setup6DigitInput();
-    
-    // Start resend timer
-    this.startResendTimer();
-    
-    // Update top bar
-    this.updateTopBar();
     
     // Update connection indicator
     if (this.offlineManager) {
@@ -867,186 +822,142 @@ class PickleballApp {
     }
   }
 
-  async requestVerificationCode() {
-    const refId = document.getElementById('ref-id')?.value.toUpperCase().trim() || this.mockRefId;
+
+  async login() {
+    const username = document.getElementById('username')?.value.trim() || this.mockUsername;
+    const password = document.getElementById('password')?.value.trim() || this.mockPassword;
     
-    if (!refId || refId.trim() === '') {
-      if (document.getElementById('ref-id')) {
-        this.showAuthError('Please enter a Referee ID');
-        return;
-      } else {
-        throw new Error('Please enter a Referee ID');
-      }
+    if (!username) {
+      this.showAuthError('Please enter a username');
+      return;
     }
     
-    const sendBtn = document.getElementById('send-code-btn');
-    sendBtn.disabled = true;
-    sendBtn.textContent = 'Sending...';
+    if (!password) {
+      this.showAuthError('Please enter a password');
+      return;
+    }
+    
+    const loginBtn = document.getElementById('login-btn');
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Logging in...';
     
     try {
       let response;
       
-      if (this.config.demo.enabled && this.config.demo.authCodes.includes(refId)) {
-        // Demo mode - simulate code request
+      // Check demo credentials first
+      const demoCredentials = this.config.demo.credentials;
+      const validDemoCredential = demoCredentials.find(
+        cred => cred.username === username && cred.password === password
+      );
+      
+      if (this.config.demo.enabled && validDemoCredential) {
+        // Demo mode with valid demo credentials
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        if (refId === 'DEMO' || refId === 'TEST') {
-          response = {
-            success: true,
-            message: "Demo mode: Use code 111111",
-            method: "demo",
-            maskedContact: "demo@example.com"
-          };
-        } else {
-          response = {
-            success: true,
-            message: "Verification code sent successfully",
-            method: "email",
-            maskedContact: "j***@tournament.com"
-          };
-        }
+        response = {
+          success: true,
+          data: {
+            user: {
+              id: `demo-${username}-id`,
+              username: username,
+              email: `${username}@demo.com`,
+              firstName: username.charAt(0).toUpperCase() + username.slice(1),
+              lastName: 'User',
+              role: username === 'admin' ? 'SUPER_ADMIN' : 'TOURNAMENT_ADMIN',
+              isActive: true,
+              token: `demo-jwt-token-${Date.now()}`,
+              refreshToken: `demo-refresh-token-${Date.now()}`,
+              expiresAt: new Date(Date.now() + 3600000).toISOString() // 1 hour
+            }
+          }
+        };
       } else {
-        // Real API call
-        const apiResponse = await fetch(`${this.config.apis.auth.endpoint}/request-code`, {
+        // Real API call (either demo mode disabled or non-demo credentials)
+        console.log('Making real API call to:', this.config.apis.auth.loginEndpoint);
+        const apiResponse = await fetch(this.config.apis.auth.loginEndpoint, {
           method: 'POST',
+          mode: 'cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refId }),
-          timeout: this.config.apis.timeout
+          body: JSON.stringify({ username, password })
         });
+        
+        if (!apiResponse.ok) {
+          throw new Error(`HTTP ${apiResponse.status}: ${apiResponse.statusText}`);
+        }
         
         response = await apiResponse.json();
         
         if (!response.success) {
-          throw new Error(response.message || 'Failed to send verification code');
+          throw new Error(response.error?.message || 'Login failed');
         }
       }
       
-      // Store ref ID and request time
-      this.authState.refId = refId;
-      this.authState.codeRequestTime = Date.now();
-      this.authState.attempts = 0;
-      
-      // Show step 2
-      this.showStep2Screen(response.maskedContact, response.method);
-      
-    } catch (error) {
-      this.showAuthError(error.message || 'Failed to send verification code');
-      sendBtn.disabled = false;
-      sendBtn.textContent = 'Send Code';
-    }
-  }
-  
-  async verifyCode() {
-    const verificationCode = this.getVerificationCode() || this.mockVerificationCode;
-    
-    if (!verificationCode || verificationCode.length !== 6) {
-      if (document.getElementById('verification-code')) {
-        this.showAuthError('Please enter a 6-digit verification code');
-        return;
-      } else {
-        throw new Error('Please enter a 6-digit verification code');
-      }
-    }
-    
-    const verifyBtn = document.getElementById('verify-btn');
-    verifyBtn.disabled = true;
-    verifyBtn.textContent = 'Verifying...';
-    
-    try {
-      let response;
-      
-      if (this.config.demo.enabled && this.config.demo.authCodes.includes(this.authState.refId)) {
-        // Demo mode - simulate verification
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        if ((this.authState.refId === 'DEMO' || this.authState.refId === 'TEST') && verificationCode === '111111') {
-          response = {
-            token: "demo-jwt-token-" + Date.now(),
-            refereeId: "DEMO-REF",
-            expiresIn: 1800,
-            refreshToken: "demo-refresh-token"
-          };
-        } else if (verificationCode === '123456') {
-          response = {
-            token: "jwt-token-" + Date.now(),
-            refereeId: this.authState.refId === 'ADMIN123' ? 'ADMIN001' : 'REF001',
-            expiresIn: 3600,
-            refreshToken: "refresh-token-" + Date.now()
-          };
-        } else {
-          this.authState.attempts++;
-          const attemptsRemaining = 3 - this.authState.attempts;
-          
-          if (attemptsRemaining <= 0) {
-            throw new Error('Too many failed attempts. Please request a new code.');
-          } else {
-            throw new Error(`Invalid verification code. ${attemptsRemaining} attempts remaining.`);
-          }
-        }
-      } else {
-        // Real API call
-        const apiResponse = await fetch(`${this.config.apis.auth.endpoint}/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            refId: this.authState.refId, 
-            verificationCode 
-          }),
-          timeout: this.config.apis.timeout
-        });
-        
-        response = await apiResponse.json();
-        
-        if (!response.token) {
-          this.authState.attempts++;
-          throw new Error(response.message || 'Invalid verification code');
-        }
-      }
-      
-      // Store JWT token
-      this.storeJWTToken(response.token, response.refreshToken, response.expiresIn);
-      sessionStorage.setItem('refereeId', response.refereeId);
-      
-      // Clear auth state
-      this.authState = {
-        refId: null,
-        verificationCode: null,
-        token: response.token,
-        codeRequestTime: null,
-        attempts: 0,
-        currentScreen: 'authenticated'
-      };
+      // Store authentication data
+      this.storeAuthData(response.data.user);
       
       // Navigate to match setup
       this.showMatchSetup();
       
     } catch (error) {
-      this.showAuthError(error.message || 'Verification failed');
-      verifyBtn.disabled = false;
-      verifyBtn.textContent = 'Verify';
+      this.showAuthError(error.message || 'Login failed');
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login';
     }
   }
   
-  storeJWTToken(token, refreshToken, expiresIn) {
-    sessionStorage.setItem('authToken', token);
-    sessionStorage.setItem('refreshToken', refreshToken);
-    sessionStorage.setItem('tokenExpires', Date.now() + (expiresIn * 1000));
+  storeAuthData(userData) {
+    this.authState = {
+      user: {
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        role: userData.role,
+        isActive: userData.isActive
+      },
+      token: userData.token,
+      refreshToken: userData.refreshToken,
+      expiresAt: userData.expiresAt,
+      isAuthenticated: true
+    };
+    
+    // Store in sessionStorage
+    sessionStorage.setItem('authToken', userData.token);
+    sessionStorage.setItem('refreshToken', userData.refreshToken);
+    sessionStorage.setItem('expiresAt', userData.expiresAt);
+    sessionStorage.setItem('userData', JSON.stringify(this.authState.user));
+    
+    // Legacy compatibility
+    sessionStorage.setItem('refereeId', userData.id);
   }
   
-  goBackToStep1() {
-    this.authState.currentScreen = 'auth-step1';
-    this.authState.refId = null;
-    this.authState.codeRequestTime = null;
-    this.authState.attempts = 0;
-    this.showStep1Screen();
+  clearAuthData() {
+    this.authState = {
+      user: null,
+      token: null,
+      refreshToken: null,
+      expiresAt: null,
+      isAuthenticated: false
+    };
+    
+    // Clear sessionStorage
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('refreshToken');
+    sessionStorage.removeItem('expiresAt');
+    sessionStorage.removeItem('userData');
+    sessionStorage.removeItem('refereeId');
+    sessionStorage.removeItem('tokenExpires'); // Legacy cleanup
   }
+  
+
   
   updateTopBar() {
     const topBar = document.getElementById('top-bar');
     if (!topBar) return;
     
-    const refereeId = sessionStorage.getItem('refereeId') || 'DEMO-REF';
-    const refereeType = refereeId.includes('ADMIN') ? 'Admin' : 'Referee';
+    const user = this.authState.user;
+    const userDisplay = user ? `${user.firstName} ${user.lastName} (${user.role})` : 'Demo User';
     const isOnline = navigator.onLine;
     const connectionStatus = isOnline ? '📶 Online' : '📥 Offline';
     
@@ -1055,211 +966,19 @@ class PickleballApp {
         <span class="connection-indicator">${connectionStatus}</span>
       </div>
       <div class="top-bar-right">
-        <span class="user-info">Logged in as: ${refereeType} (${refereeId})</span>
+        <span class="user-info">Logged in as: ${userDisplay}</span>
         <button class="logout-btn" onclick="app.logout()">Logout</button>
       </div>
     `;
   }
-  
-  async resendCode() {
-    if (!this.authState.refId) {
-      this.goBackToStep1();
-      return;
-    }
-    
-    const resendBtn = document.getElementById('resend-btn');
-    resendBtn.disabled = true;
-    resendBtn.textContent = 'Sending...';
-    
-    try {
-      // Reset attempts
-      this.authState.attempts = 0;
-      
-      // Simulate resend (same logic as initial request)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      let response;
-      if (this.authState.refId === 'DEMO' || this.authState.refId === 'TEST') {
-        response = {
-          success: true,
-          message: "Demo mode: Use code 111111",
-          method: "demo",
-          maskedContact: "demo@example.com"
-        };
-      } else {
-        response = {
-          success: true,
-          message: "Verification code sent successfully",
-          method: "email",
-          maskedContact: "j***@tournament.com"
-        };
-      }
-      
-      this.authState.codeRequestTime = Date.now();
-      
-      // Show success message
-      const contactInfo = document.querySelector('.contact-info');
-      contactInfo.innerHTML = `Code resent via ${response.method} to: <strong>${response.maskedContact}</strong>`;
-      
-      // Restart timer
-      this.startResendTimer();
-      
-    } catch (error) {
-      this.showAuthError('Failed to resend code: ' + error.message);
-      resendBtn.disabled = false;
-      resendBtn.textContent = 'Resend Code';
-    }
-  }
-  
-  startResendTimer() {
-    const resendBtn = document.getElementById('resend-btn');
-    const timerSpan = document.getElementById('resend-timer');
-    let seconds = 60;
-    
-    const timer = setInterval(() => {
-      seconds--;
-      timerSpan.textContent = `Wait ${seconds}s`;
-      
-      if (seconds <= 0) {
-        clearInterval(timer);
-        resendBtn.disabled = false;
-        resendBtn.textContent = 'Resend Code';
-        timerSpan.textContent = '';
-      }
-    }, 1000);
-  }
 
-  setup6DigitInput() {
-    const container = document.getElementById('digit-container');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    for (let i = 0; i < 6; i++) {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'digit-input';
-      input.maxLength = 1;
-      input.setAttribute('inputmode', 'numeric');
-      input.dataset.index = i;
-      
-      // Input event for auto-advance and validation
-      input.addEventListener('input', (e) => {
-        const value = e.target.value;
-        
-        // Only allow numeric characters - keep first digit if mixed
-        if (value.length > 1) {
-          // If multiple characters, keep only the first digit if it's numeric
-          const firstChar = value[0];
-          if (/^[0-9]$/.test(firstChar)) {
-            e.target.value = firstChar;
-          } else {
-            e.target.value = '';
-            return;
-          }
-        } else if (!/^[0-9]$/.test(value) && value !== '') {
-          e.target.value = '';
-          return;
-        }
-        
-        // Auto-advance to next input
-        const nextIndex = parseInt(e.target.dataset.index) + 1;
-        if (nextIndex < 6) {
-          const nextInput = container.querySelector(`[data-index="${nextIndex}"]`);
-          if (nextInput) {
-            nextInput.focus();
-          }
-        }
-        
-        // Check for auto-submit
-        this.checkAutoSubmit();
-      });
-      
-      // Keydown event for backspace navigation
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace') {
-          if (e.target.value !== '') {
-            // Clear current input if it has a value
-            e.target.value = '';
-          } else {
-            // Move to previous input if current is empty
-            const prevIndex = parseInt(e.target.dataset.index) - 1;
-            if (prevIndex >= 0) {
-              const prevInput = container.querySelector(`[data-index="${prevIndex}"]`);
-              if (prevInput) {
-                prevInput.focus();
-              }
-            }
-          }
-        }
-      });
-      
-      // Paste event for distributing 6-digit codes
-      input.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const pastedData = e.clipboardData.getData('text/plain');
-        
-        if (/^[0-9]{6}$/.test(pastedData)) {
-          // Distribute digits across inputs
-          for (let j = 0; j < 6; j++) {
-            const digitInput = container.querySelector(`[data-index="${j}"]`);
-            if (digitInput) {
-              digitInput.value = pastedData[j];
-            }
-          }
-          
-          // Focus last input
-          const lastInput = container.querySelector(`[data-index="5"]`);
-          if (lastInput) {
-            lastInput.focus();
-          }
-          
-          // Check for auto-submit
-          this.checkAutoSubmit();
-        }
-      });
-      
-      container.appendChild(input);
-    }
-    
-    // Focus first input
-    const firstInput = container.querySelector('[data-index="0"]');
-    if (firstInput) {
-      firstInput.focus();
-    }
-  }
-  
-  getVerificationCode() {
-    const container = document.getElementById('digit-container');
-    if (!container) return '';
-    
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      const input = container.querySelector(`[data-index="${i}"]`);
-      if (input) {
-        code += input.value;
-      }
-    }
-    
-    return code;
-  }
-  
-  checkAutoSubmit() {
-    const code = this.getVerificationCode();
-    if (code.length === 6) {
-      this.handleVerification(code);
-    }
-  }
-  
-  handleVerification(code) {
-    // Set the code and trigger verification
-    this.mockVerificationCode = code;
-    this.verifyCode();
-  }
-  
-  showVerificationStep() {
-    this.showStep2Screen('demo@example.com', 'demo');
-  }
+
+
+
+
+
+
+
   
   showAuthError(message) {
     const errorDiv = document.getElementById('auth-error');
@@ -1358,22 +1077,24 @@ class PickleballApp {
     }
   }
 
-  logout() {
-    // Clear authentication data
-    sessionStorage.removeItem('authToken');
-    sessionStorage.removeItem('refreshToken');
-    sessionStorage.removeItem('tokenExpires');
-    sessionStorage.removeItem('refereeId');
+  async logout() {
+    try {
+      // Call logout API if not in demo mode
+      if (!this.config.demo.enabled) {
+        await fetch(this.config.apis.auth.logoutEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.authState.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('Logout API call failed:', error.message);
+    }
     
-    // Reset auth state
-    this.authState = {
-      refId: null,
-      verificationCode: null,
-      token: null,
-      codeRequestTime: null,
-      attempts: 0,
-      currentScreen: 'auth-step1'
-    };
+    // Clear authentication data
+    this.clearAuthData();
     
     // Reset game state
     this.gameState = {
@@ -1392,8 +1113,6 @@ class PickleballApp {
     };
     
     this.gameHistory = [];
-    
-    // Clear loaded match
     this.loadedMatch = null;
     
     // Return to auth screen

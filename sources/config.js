@@ -3,15 +3,31 @@ const TournamentConfig = {
   // API Configuration
   apis: {
     auth: {
-      endpoint: 'https://api.tournament-system.com/auth',
+      baseUrl: 'http://tournament-development-1102330393.ap-southeast-5.elb.amazonaws.com/api',
+      loginEndpoint: 'http://tournament-development-1102330393.ap-southeast-5.elb.amazonaws.com/api/auth/login',
+      refreshEndpoint: 'http://tournament-development-1102330393.ap-southeast-5.elb.amazonaws.com/api/auth/refresh',
+      logoutEndpoint: 'http://tournament-development-1102330393.ap-southeast-5.elb.amazonaws.com/api/auth/logout',
       method: 'POST',
       required: {
-        authCode: 'string'
+        username: 'string',
+        password: 'string'
       },
       response: {
-        token: 'string',
-        refereeId: 'string',
-        expiresIn: 'number'
+        success: 'boolean',
+        data: {
+          user: {
+            id: 'string',
+            username: 'string',
+            email: 'string',
+            firstName: 'string',
+            lastName: 'string',
+            role: 'string',
+            isActive: 'boolean',
+            token: 'string',
+            refreshToken: 'string',
+            expiresAt: 'string'
+          }
+        }
       }
     },
     matches: {
@@ -53,9 +69,15 @@ const TournamentConfig = {
   
   // Demo Mode Settings
   demo: {
-    enabled: true,
+    enabled: false,
     successRate: 0.8,  // 80% success rate (0.0 = always fail, 1.0 = always succeed)
-    authCodes: ['REF2024', 'ADMIN123', 'DEMO', 'TEST']
+    credentials: [
+      { username: 'demo', password: 'demo123' },
+      { username: 'test', password: 'test123' },
+      { username: 'admin', password: 'admin123' },
+      { username: 'referee', password: 'ref123' },
+      { username: 'user3', password: 'password1' }  // Vendor test credentials
+    ]
   },
   
   // Game Settings

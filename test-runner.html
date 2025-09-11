@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Runner</title>
+    <script src="./tests/setup.js"></script>
+    <script src="./sources/config.js"></script>
+    <script src="./sources/demo-data.js"></script>
+</head>
+<body>
+    <div id="test-results"></div>
+    <script>
+        // Simple test runner to validate our new auth tests
+        async function runTests() {
+            const results = document.getElementById('test-results');
+            
+            // Load and run the new auth tests
+            try {
+                const response = await fetch('./tests/username-password-auth.test.js');
+                const testCode = await response.text();
+                
+                // Create a simple test environment
+                let testsPassed = 0;
+                let testsFailed = 0;
+                
+                // Mock describe and test functions
+                window.describe = function(name, fn) {
+                    results.innerHTML += `<h3>Testing: ${name}</h3>`;
+                    fn();
+                };
+                
+                window.test = function(name, fn) {
+                    try {
+                        fn();
+                        results.innerHTML += `<p style="color: green;">✓ ${name}</p>`;
+                        testsPassed++;
+                    } catch (error) {
+                        results.innerHTML += `<p style="color: red;">✗ ${name}: ${error.message}</p>`;
+                        testsFailed++;
+                    }
+                };
+                
+                window.expect = function(actual) {
+                    return {
+                        toBe: (expected) => {
+                            if (actual !== expected) {
+                                throw new Error(`Expected ${expected}, got ${actual}`);
+                            }
+                        },
+                        toBeTruthy: () => {
+                            if (!actual) {
+                                throw new Error(`Expected truthy value, got ${actual}`);
+                            }
+                        },
+                        toBeNull: () => {
+                            if (actual !== null) {
+                                throw new Error(`Expected null, got ${actual}`);
+                            }
+                        },
+                        toBeFalsy: () => {
+                            if (actual) {
+                                throw new Error(`Expected falsy value, got ${actual}`);
+                            }
+                        }
+                    };
+                };
+                
+                window.beforeEach = function(fn) {
+                    // Simple beforeEach implementation
+                    fn();
+                };
+                
+                // Execute the test code
+                eval(testCode);
+                
+                results.innerHTML += `<h2>Results: ${testsPassed} passed, ${testsFailed} failed</h2>`;
+                
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">Error loading tests: ${error.message}</p>`;
+            }
+        }
+        
+        runTests();
+    </script>
+</body>
+</html>
