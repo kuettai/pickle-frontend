@@ -69,7 +69,7 @@ const TournamentConfig = {
   
   // Demo Mode Settings
   demo: {
-    enabled: false,
+    enabled: true,  // Enable demo mode to keep demo users working
     successRate: 0.8,  // 80% success rate (0.0 = always fail, 1.0 = always succeed)
     credentials: [
       { username: 'demo', password: 'demo123' },

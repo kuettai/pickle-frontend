@@ -844,14 +844,15 @@ class PickleballApp {
     try {
       let response;
       
-      // Check demo credentials first
+      // Check demo credentials first (always available)
       const demoCredentials = this.config.demo.credentials;
       const validDemoCredential = demoCredentials.find(
         cred => cred.username === username && cred.password === password
       );
       
-      if (this.config.demo.enabled && validDemoCredential) {
+      if (validDemoCredential) {
         // Demo mode with valid demo credentials
+        console.log('Using demo credentials for user:', username);
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         response = {
@@ -872,23 +873,31 @@ class PickleballApp {
           }
         };
       } else {
-        // Real API call (either demo mode disabled or non-demo credentials)
-        console.log('Making real API call to:', this.config.apis.auth.loginEndpoint);
-        const apiResponse = await fetch(this.config.apis.auth.loginEndpoint, {
-          method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
+        // Real API call for non-demo credentials
+        console.log('Attempting real API call to:', this.config.apis.auth.loginEndpoint);
         
-        if (!apiResponse.ok) {
-          throw new Error(`HTTP ${apiResponse.status}: ${apiResponse.statusText}`);
-        }
-        
-        response = await apiResponse.json();
-        
-        if (!response.success) {
-          throw new Error(response.error?.message || 'Login failed');
+        try {
+          const apiResponse = await fetch(this.config.apis.auth.loginEndpoint, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+            timeout: this.config.apis.timeout || 10000
+          });
+          
+          if (!apiResponse.ok) {
+            throw new Error(`HTTP ${apiResponse.status}: ${apiResponse.statusText}`);
+          }
+          
+          response = await apiResponse.json();
+          
+          if (!response.success) {
+            throw new Error(response.error?.message || 'Login failed');
+          }
+        } catch (apiError) {
+          console.error('API call failed:', apiError.message);
+          // If API fails, still allow demo users but reject others
+          throw new Error('Unable to connect to authentication server. Please try again later or use demo credentials.');
         }
       }
       

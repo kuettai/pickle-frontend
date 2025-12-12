@@ -8,10 +8,11 @@ describe('Username/Password Authentication System', () => {
       this.config = {
         api: {
           baseUrl: 'https://pickle.frenchbread.dev/api',
-          timeout: 10000
+          timeout: 10000,
+          fallbackToDemo: true  // Enable graceful fallback
         },
         demo: {
-          enabled: true,
+          enabled: true,  // Always enable demo mode
           credentials: [
             { username: 'demo', password: 'demo123' },
             { username: 'test', password: 'test123' },
@@ -38,39 +39,38 @@ describe('Username/Password Authentication System', () => {
         throw new Error('Please enter a password');
       }
       
-      // Demo mode handling
-      if (this.config.demo.enabled) {
-        const demoUser = this.config.demo.credentials.find(
-          cred => cred.username === username && cred.password === password
-        );
+      // Check demo credentials first (always available)
+      const demoUser = this.config.demo.credentials.find(
+        cred => cred.username === username && cred.password === password
+      );
+      
+      if (demoUser) {
+        await new Promise(resolve => setTimeout(resolve, 100)); // Simulate API delay
         
-        if (demoUser) {
-          await new Promise(resolve => setTimeout(resolve, 100)); // Simulate API delay
-          
-          const mockResponse = {
-            success: true,
-            data: {
-              user: {
-                id: `demo-${username}-id`,
-                username: username,
-                email: `${username}@demo.com`,
-                firstName: username.charAt(0).toUpperCase() + username.slice(1),
-                lastName: 'User',
-                role: username === 'admin' ? 'SUPER_ADMIN' : 'TOURNAMENT_ADMIN',
-                isActive: true,
-                token: `demo-jwt-token-${Date.now()}`,
-                refreshToken: `demo-refresh-token-${Date.now()}`,
-                expiresAt: new Date(Date.now() + 3600000).toISOString() // 1 hour
-              }
+        const mockResponse = {
+          success: true,
+          data: {
+            user: {
+              id: `demo-${username}-id`,
+              username: username,
+              email: `${username}@demo.com`,
+              firstName: username.charAt(0).toUpperCase() + username.slice(1),
+              lastName: 'User',
+              role: username === 'admin' ? 'SUPER_ADMIN' : 'TOURNAMENT_ADMIN',
+              isActive: true,
+              token: `demo-jwt-token-${Date.now()}`,
+              refreshToken: `demo-refresh-token-${Date.now()}`,
+              expiresAt: new Date(Date.now() + 3600000).toISOString() // 1 hour
             }
-          };
-          
-          this.storeAuthData(mockResponse.data.user);
-          return mockResponse;
-        }
+          }
+        };
+        
+        this.storeAuthData(mockResponse.data.user);
+        return mockResponse;
       }
       
-      // Real API call would go here
+      // If not demo user, would attempt real API call here
+      // For now, reject non-demo credentials gracefully
       throw new Error('Invalid username or password');
     }
     
